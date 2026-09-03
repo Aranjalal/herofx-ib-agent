@@ -1,0 +1,62 @@
+{
+  "admin": {
+    "telegram_user_id": 5096366760
+  },
+  "instagram": {
+    "username": "herofx_official",
+    "check_interval_hours": 24
+  },
+  "telegram": {
+    "palawanfx": {
+          "bot_token": "8892629496:AAFENMLzjd6UNiXVsY72HZqg_5ObAGvTWpI",
+          "channel_id": "@PalawanFX",
+          "language": "ckb",
+          "language_name": "Kurdish Sorani"
+        },
+        "batalfx": {
+          "bot_token": "8792058457:AAEOhk16i99YMrNN7_WZJOo7gzLNE40b_Os",
+          "channel_id": "@BatalFX",
+          "language": "ar",
+          "language_name": "Arabic"
+        }
+  },
+  "ib_link": {
+    "url": "https://herofx.co/?partner_code=8591993",
+    "cta_templates": {
+      "account": {
+        "ckb": "دروستکردنی هەژماری HeroFX و دەستپێکردنی بەرهەمهێنان لە بازاڕەکاندا، کلیک لێرە بکە👉🏻 https://herofx.co/?partner_code=8591993",
+        "ar": "افتح حساب HeroFX وابدأ في جني الأرباح من الأسواق، اضغط هنا👉🏻 https://herofx.co/?partner_code=8591993"
+      },
+      "contest": {
+        "ckb": "بەشداری لە پێشبڕکیەکانی HeroFX بکە و برینەکانی ڕاستەقینە بەدەست بهێنە، تۆمارکردن لێرەوە دەست پێ دەکات👉🏻 https://herofx.co/?partner_code=8591993",
+        "ar": "شارك في مسابقات HeroFX واربح جوائز حقيقية، سجل من هنا👉🏻 https://herofx.co/?partner_code=8591993"
+      },
+      "benefits": {
+        "ckb": "بەشداری بکە لە پرۆگرامی IB ی HeroFX و کۆمیسیۆنی هەژماری بێ سنوور بەدەست بهێنە، لێرە تۆمار بکە👉🏻 https://herofx.co/?partner_code=8591993",
+        "ar": "انضم إلى برنامج IB في HeroFX واحصل على عمولات غير محدودة، سجل من هنا👉🏻 https://herofx.co/?partner_code=8591993"
+      },
+      "general": {
+        "ckb": "بەشداری بکە لە کۆمەڵگای بازرگانەکانی HeroFX، ئێستا هەژمارەکەت بکەرەوە👉🏻 https://herofx.co/?partner_code=8591993",
+        "ar": "انضم إلى مجتمع متداولي HeroFX، افتح حسابك الآن👉🏻 https://herofx.co/?partner_code=8591993"
+      }
+    },
+    "keywords": {
+      "account": ["account", "register", "sign up", "open", "join", "hero10x", "prop", "funding", "deposit", "bonus"],
+      "contest": ["contest", "competition", "weekly", "prize", "winner", "reward", "demo"],
+      "benefits": ["benefit", "earn", "profit", "commission", "ib", "partner", "income", "lot", "spread", "trading"]
+    }
+  },
+  "ai": {
+    "provider": "gemini",
+    "model": "gemini-3.5-flash-lite",
+    "max_tokens": 1024,
+    "temperature": 0.7
+  },
+  "settings": {
+    "max_caption_length": 1024,
+    "delay_between_posts_seconds": 5,
+    "log_file": "bot.log",
+    "posting_time": "15:00",
+    "timezone": "Asia/Baghdad"
+  }
+}

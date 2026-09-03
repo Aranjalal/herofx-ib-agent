@@ -1,0 +1,9 @@
+python-telegram-bot[job-queue]==21.6
+google-genai>=1.0.0
+Pillow==11.1.0
+pytesseract==0.3.13
+deep-translator==1.11.4
+aiohttp==3.10.11
+apscheduler==3.10.4
+pytz==2024.1
+playwright==1.48.0
