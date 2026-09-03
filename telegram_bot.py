@@ -4,6 +4,7 @@ Telegram Bot - handles preview, approval, and posting
 
 import asyncio
 import logging
+import os
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, Any, Optional, List
@@ -53,7 +54,19 @@ class TelegramBot:
             logger.error(f"Startup message failed: {e}")
         
         logger.info("Bot is running!")
-        await self.app.run_polling(allowed_updates=Update.ALL_TYPES)
+        
+        # Use webhook if WEBHOOD_URL is set, otherwise polling
+        webhook_url = os.environ.get("WEBHOOK_URL")
+        if webhook_url:
+            logger.info(f"Starting with webhook: {webhook_url}")
+            await self.app.run_webhook(
+                listen="0.0.0.0",
+                port=int(os.environ.get("PORT", 8080)),
+                webhook_url=webhook_url
+            )
+        else:
+            logger.info("Starting with polling")
+            await self.app.run_polling(allowed_updates=Update.ALL_TYPES)
     
     async def send_preview_from_scheduler(self, post_data: Dict[str, Any], media_paths: List[Path]):
         """Send preview from scheduler (no update/context available)."""
