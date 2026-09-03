@@ -39,6 +39,9 @@ class TelegramBot:
         self.app.add_handler(CallbackQueryHandler(self.handle_callback))
         self.app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_text))
         
+        # Add webhook handler for root path (health check)
+        self.app.add_handler(CommandHandler("health", self.handle_health))
+        
         # Send startup message
         try:
             await self.app.bot.send_message(
