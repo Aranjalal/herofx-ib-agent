@@ -1,5 +1,6 @@
 """
 Configuration management for HeroFX IB Agent
+Priority: Environment variables > config.json
 """
 
 import json
@@ -77,7 +78,13 @@ class Config:
         return self._data["settings"]["delay_between_posts_seconds"]
     
     def get_channel(self, channel_key: str) -> Dict[str, Any]:
-        return self._data["telegram"][channel_key]
+        channel = self._data["telegram"][channel_key]
+        # Override with environment variables if available
+        env_token = os.environ.get(f"{channel_key.upper()}_BOT_TOKEN")
+        if env_token:
+            channel = dict(channel)  # Don't modify original
+            channel["bot_token"] = env_token
+        return channel
     
     def get_ib_footer(self, caption: str, lang: str) -> str:
         """Get IB footer based on caption topic detection."""
