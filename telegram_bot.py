@@ -1,13 +1,14 @@
 """
 Telegram Bot - handles preview, approval, and posting
+Uses polling locally, webhook on Railway
 """
 
 import asyncio
 import logging
 import os
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, List
 
 from telegram import Bot, Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto, InputMediaVideo
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
@@ -39,9 +40,6 @@ class TelegramBot:
         self.app.add_handler(CallbackQueryHandler(self.handle_callback))
         self.app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_text))
         
-        # Add webhook handler for root path (health check)
-        self.app.add_handler(CommandHandler("health", self.handle_health))
-        
         # Send startup message
         try:
             await self.app.bot.send_message(
@@ -58,10 +56,16 @@ class TelegramBot:
         
         logger.info("Bot is running!")
         
-        # Use webhook if WEBHOOD_URL is set, otherwise polling
+        # Use webhook if WEBHOOK_URL is set, otherwise polling
         webhook_url = os.environ.get("WEBHOOK_URL")
         if webhook_url:
             logger.info(f"Starting with webhook: {webhook_url}")
+            # Delete any existing webhook first
+            await self.app.bot.delete_webhook()
+            # Set webhook
+            await self.app.bot.set_webhook(url=webhook_url)
+            logger.info("Webhook set successfully")
+            # Start webhook server
             await self.app.run_webhook(
                 listen="0.0.0.0",
                 port=int(os.environ.get("PORT", 8080)),
@@ -145,7 +149,6 @@ class TelegramBot:
             await update.message.reply_text("Access denied.")
             return
         
-        # Get URL from command args
         if not context.args:
             await update.message.reply_text("Usage: /post <instagram_url>")
             return
@@ -156,8 +159,6 @@ class TelegramBot:
             return
         
         status_msg = await update.message.reply_text("🔄 Processing your link...")
-        
-        # Process the post
         await self._process_instagram_post(url, status_msg, update, context)
     
     async def handle_check_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -170,7 +171,6 @@ class TelegramBot:
         
         monitor = InstagramMonitor(self.config.instagram_username)
         
-        # Get last posted shortcode
         last_shortcode = None
         if self.posted_db.data['posted_ids']:
             last_shortcode = self.posted_db.data['posted_ids'][-1]
@@ -190,7 +190,6 @@ class TelegramBot:
         """Process a single Instagram post from URL."""
         monitor = InstagramMonitor(self.config.instagram_username)
         
-        # Get post details
         post = await monitor.get_post_by_url(url)
         if not post:
             await status_msg.edit_text("❌ Failed to get post details. Check the URL.")
@@ -198,7 +197,6 @@ class TelegramBot:
         
         await status_msg.edit_text(f"📸 Post found! Downloading {len(post.media_urls)} media file(s)...")
         
-        # Download media
         media_paths = await monitor.download_media(post)
         if not media_paths:
             await status_msg.edit_text("❌ Failed to download media.")
@@ -206,25 +204,21 @@ class TelegramBot:
         
         await status_msg.edit_text("🤖 Analyzing with AI...")
         
-        # Analyze with AI
         ai_result = self.ai.analyze_post(media_paths, post.caption)
         
         if not ai_result:
             await status_msg.edit_text("❌ AI analysis failed.")
             return
         
-        # Build preview
         ckb_caption = ai_result['ckb']
         ar_caption = ai_result['ar']
         
-        # Add IB footer
         ib_ckb = self.config.get_ib_footer(post.caption, "ckb")
         ib_ar = self.config.get_ib_footer(post.caption, "ar")
         
         preview_ckb = f"{ckb_caption}{ib_ckb}" if ckb_caption else ""
         preview_ar = f"{ar_caption}{ib_ar}" if ar_caption else ""
         
-        # Store pending
         pending_id = f"post_{post.shortcode}"
         self.posted_db.add_pending(pending_id, {
             "shortcode": post.shortcode,
@@ -239,7 +233,6 @@ class TelegramBot:
             "detected_at": datetime.now().isoformat()
         })
         
-        # Send preview
         await status_msg.delete()
         
         preview_text = (
@@ -264,7 +257,6 @@ class TelegramBot:
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        # Send preview with first image
         if media_paths:
             with open(media_paths[0], "rb") as photo:
                 await update.message.reply_photo(
@@ -275,23 +267,19 @@ class TelegramBot:
     
     async def _process_post(self, post: InstagramPost, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Process a post from auto-check."""
-        # Same as _process_instagram_post but without status_msg
         monitor = InstagramMonitor(self.config.instagram_username)
         
-        # Download media
         media_paths = await monitor.download_media(post)
         if not media_paths:
             logger.error(f"Failed to download media for {post.shortcode}")
             return
         
-        # Analyze with AI
         ai_result = self.ai.analyze_post(media_paths, post.caption)
         
         if not ai_result:
             logger.error(f"AI analysis failed for {post.shortcode}")
             return
         
-        # Build preview
         ckb_caption = ai_result['ckb']
         ar_caption = ai_result['ar']
         
@@ -301,7 +289,6 @@ class TelegramBot:
         preview_ckb = f"{ckb_caption}{ib_ckb}" if ckb_caption else ""
         preview_ar = f"{ar_caption}{ib_ar}" if ar_caption else ""
         
-        # Store pending
         pending_id = f"post_{post.shortcode}"
         self.posted_db.add_pending(pending_id, {
             "shortcode": post.shortcode,
@@ -316,7 +303,6 @@ class TelegramBot:
             "detected_at": datetime.now().isoformat()
         })
         
-        # Send preview to admin
         preview_text = (
             f"📸 New Instagram Post Detected\n"
             f"🔗 {post.url}\n\n"
@@ -374,9 +360,25 @@ class TelegramBot:
             await query.answer("Post expired.", show_alert=True)
             return
         
-        await query.answer("Posting to channels...")
+        # Determine if this was auto-detected or manual
+        is_auto_detected = post_data.get("detected_at") is not None
         
-        # Post to both channels
+        if is_auto_detected:
+            await query.answer("Scheduled for 3:00 PM posting...")
+            await query.message.reply_text("⏰ Post approved! It will be posted at 3:00 PM Slemani time.")
+            # Keep in pending - the 3:00 PM scheduler will pick it up
+            await query.edit_message_reply_markup(reply_markup=None)
+        else:
+            await query.answer("Posting immediately...")
+            # Post immediately
+            await self._post_pending(pending_id, query, context)
+    
+    async def _post_pending(self, pending_id: str, query, context: ContextTypes.DEFAULT_TYPE):
+        """Post a pending post to both channels."""
+        post_data = self.posted_db.get_pending(pending_id)
+        if not post_data:
+            return
+        
         for channel_key in ["palawanfx", "batalfx"]:
             channel_config = self.config.get_channel(channel_key)
             target_lang = channel_config["language"]
@@ -401,11 +403,9 @@ class TelegramBot:
             
             await asyncio.sleep(self.config.delay_between_posts)
         
-        # Mark as posted
         self.posted_db.mark_posted(pending_id)
         self.posted_db.remove_pending(pending_id)
         
-        # Cleanup media
         for p in post_data.get("image_paths", []):
             try:
                 Path(p).unlink()
@@ -419,7 +419,6 @@ class TelegramBot:
         """Handle reject button."""
         post_data = self.posted_db.get_pending(pending_id)
         if post_data:
-            # Cleanup media
             for p in post_data.get("image_paths", []):
                 try:
                     Path(p).unlink()
@@ -460,7 +459,6 @@ class TelegramBot:
         
         new_text = update.message.text
         
-        # Update the pending post
         ib_footer = self.config.get_ib_footer(post_data["original_caption"], lang)
         if lang == "ckb":
             post_data["translated_ckb"] = new_text
@@ -471,7 +469,6 @@ class TelegramBot:
         
         self.posted_db.add_pending(pending_id, post_data)
         
-        # Send updated preview
         preview_text = (
             f"📸 Updated Preview\n\n"
             f"--- 📝 Kurdish Sorani (PalawanFX) ---\n"
@@ -501,14 +498,12 @@ class TelegramBot:
             
             if media_paths:
                 if len(media_paths) == 1:
-                    # Single media
                     with open(media_paths[0], "rb") as f:
                         if media_paths[0].suffix == ".mp4":
                             await bot.send_video(chat_id=channel_id, video=f, caption=caption[:1024])
                         else:
                             await bot.send_photo(chat_id=channel_id, photo=f, caption=caption[:1024])
                 else:
-                    # Multiple media
                     media_group = []
                     for i, mp in enumerate(media_paths[:10]):
                         with open(mp, "rb") as f:
@@ -527,7 +522,6 @@ class TelegramBot:
                     if media_group:
                         await bot.send_media_group(chat_id=channel_id, media=media_group)
             else:
-                # Text only
                 await bot.send_message(chat_id=channel_id, text=caption[:4096])
             
             return True
